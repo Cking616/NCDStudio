@@ -1,0 +1,38 @@
+{
+	"DeviceAdapter" : {
+		"tcpClient": {
+			"numOfTcpClient": 3,
+			"tcpClients" : [
+				{
+					"address": "127.0.0.1",
+					"port": 6000,
+					"name": "x_motion"
+				},
+				{
+					"address": "127.0.0.1",
+					"port": 6010,
+					"name": "y_motion"
+				},
+				{
+					"address": "127.0.0.1",
+					"port": 6020,
+					"name": "z_motion"
+				}
+			]
+		},
+		"serial" : {
+			"numOfSerial" : 0,
+			"serials" : [
+				{
+					"port" : "COM1",
+					"baud" : 9600,
+					"name" : "w_motion"
+				}
+			]
+		},
+		"widManager" : {
+			"isOpen" : false,
+			"address" : "192.168.1.1"
+		}
+	}
+}

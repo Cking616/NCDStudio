@@ -8,7 +8,9 @@ class EchoHandler(BaseRequestHandler):
             msg = self.request.recv(8192)
             if not msg:
                 break
-            self.request.send(msg)
+            print(msg)
+            msg = "!E END-"
+            self.request.send(msg.encode('utf-8'))
 
 
 if __name__ == '__main__':

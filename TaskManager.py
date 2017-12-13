@@ -29,20 +29,26 @@ class TaskManager:
                 self.is_correct = True
 
     def process(self, process_json):
-        ret = True
+        return_value = True
         with open(process_json, 'r') as f:
             reads = f.read()
             json_data = json.loads(reads)
         process_cmd = json_data["processCMD"]
         for cmd in process_cmd:
-            cmd_name = cmd["targe"]
+            cmd_name = cmd["target"]
             cmd_cmd = cmd["cmd"]
             if not self.unit_manager.process(cmd_name, cmd_cmd):
-                ret = False
+                return_value = False
                 break
-        return ret
+        return return_value
 
     def is_ready(self):
         return self.is_correct
 
 
+if __name__ == '__main__':
+    taskManger = TaskManager('init.json')
+    while True:
+        name = input("Process json name\n")
+        ret = taskManger.process(name)
+        print(ret)

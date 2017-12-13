@@ -9,10 +9,6 @@
       "cmd" : "move PCB1\n"
     },
     {
-      "target": "x_motion",
-      "cmd" : "!1start\r"
-    },
-    {
       "target": "scara",
       "cmd" : "move home\n"
     },
@@ -21,20 +17,12 @@
       "cmd" : "move PCB1\n"
     },
     {
-      "target": "x_motion",
-      "cmd" : "!1start\r"
-    },
-    {
       "target": "scara",
       "cmd" : "move home\n"
     },
     {
       "target": "scara",
       "cmd" : "move PCB1\n"
-    },
-    {
-      "target": "x_motion",
-      "cmd" : "!1start\r"
     }
   ]
 }

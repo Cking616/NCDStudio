@@ -1,7 +1,7 @@
 {
 	"DeviceAdapter" : {
 		"tcpClient": {
-			"numOfTcpClient": 3,
+			"numOfTcpClient": 1,
 			"tcpClientList" : [
 				{
 					"address": "127.0.0.1",
@@ -36,7 +36,7 @@
 		}
 	},
 	"MotionUnit" : {
-		"numOfMotionUnit" : 0,
+		"numOfMotionUnit" : 1,
 		"motionUnitList" : [
 			{
 				"type" : "SCARA",

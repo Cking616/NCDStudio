@@ -31,7 +31,8 @@
 			]
 		},
 		"widManager" : {
-			"isOpen" : false,
+			"libName" : "semi_wid110Lib.dll",
+			"isOpen" : true,
 			"address" : "192.168.1.1"
 		}
 	},

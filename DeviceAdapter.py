@@ -81,16 +81,16 @@ int     FuncLoadRecipesToSlot(    void * objptr, const char *cpFilePath, const c
 int     FuncGetLastError(         void * objptr);
 int     FuncGetErrorDescription(  void * objptr, int nError, char* strText, int nTextLength);
         """)
-        _file = 'wid110Lib.dll'
+        wid_manager_data = device_adapter_data["widManager"]
+        _file = wid_manager_data["libName"]
         _path = os.path.join(*(os.path.split(__file__)[:-1] + (_file,)))
         self.wid_lib = self.ffi.dlopen(_path)
         self.wid_manager = self.wid_lib.FuncCreateDll()
         self.is_wid_manager_init = False
-        wid_manager_data = device_adapter_data["widManager"]
         is_wid_manager_open = wid_manager_data['isOpen']
         if is_wid_manager_open:
             wid_address = wid_manager_data['address']
-            self.wid_lib.FuncInit(self.wid_manager, wid_address)
+            self.wid_lib.FuncInit(self.wid_manager, wid_address.encode('utf-8'))
             self.is_wid_manager_init = self.wid_lib.FuncIsInitialized(self.wid_manager)
 
     def __exit__(self):
@@ -128,7 +128,7 @@ int     FuncGetErrorDescription(  void * objptr, int nError, char* strText, int 
         if not self.is_wid_manager_init:
             return None
         self.wid_lib.FuncProcessRead(self.wid_manager)
-        tmp_char = self.ffi.new('char []', "123456789012345")
+        tmp_char = self.ffi.buffer(self.ffi.)
         ret_result = self.ffi.new('int *')
         self.wid_lib.FuncGetWaterId(self.wid_manager, tmp_char, 16, ret_result)
         water_id = self.ffi.string(tmp_char)
@@ -139,10 +139,15 @@ int     FuncGetErrorDescription(  void * objptr, int nError, char* strText, int 
 
 
 if __name__ == '__main__':
-    deviceAdapter = DeviceAdapter('init.json')
+    import json
+    with open('init.json', 'r') as f:
+        reads = f.read()
+        json_data = json.loads(reads)
+    deviceAdapter = DeviceAdapter(json_data)
     while True:
         name = input("请输入发生的对象\n")
-        msg = input("请输入发送的内容\n")
-        deviceAdapter.send_message(name, msg)
-        rev = deviceAdapter.receive_message(name)
+        # msg = input("请输入发送的内容\n")
+        # deviceAdapter.send_message(name, msg)
+        # rev = deviceAdapter.receive_message(name)
+        rev = deviceAdapter.read_water_id()
         print(rev)

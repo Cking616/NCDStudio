@@ -72,7 +72,7 @@ class WidReaderUnit(MotionUnit):
 
     def process_cmd(self, cmd, device_adapter):
         if cmd == 'read wid':
-            wid = device_adapter.read_water_id()
+            wid = device_adapter.read_wafer_id()
             if wid:
                 self.widList.append(wid)
                 return True
@@ -81,7 +81,7 @@ class WidReaderUnit(MotionUnit):
     def is_ready(self):
         return self.is_correct
 
-    def get_water_id(self):
+    def get_wafer_id(self):
         return self.widList.pop(0)
 
 
@@ -118,5 +118,8 @@ class UnitManager:
 
     def is_ready(self):
         return self.is_correct
+
+    def get_wafer_id(self):
+        return self.unit_dict['wid_reader'].get_wafer_id()
 
 

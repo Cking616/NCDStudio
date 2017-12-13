@@ -23,6 +23,10 @@
     {
       "target": "scara",
       "cmd" : "move PCB1\n"
+    },
+    {
+      "target": "wid_reader",
+      "cmd" : "read wid"
     }
   ]
 }

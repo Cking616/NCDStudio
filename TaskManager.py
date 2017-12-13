@@ -45,6 +45,9 @@ class TaskManager:
     def is_ready(self):
         return self.is_correct
 
+    def get_wafer_id(self):
+        return self.unit_manager.get_wafer_id()
+
 
 if __name__ == '__main__':
     taskManger = TaskManager('init.json')
@@ -52,3 +55,6 @@ if __name__ == '__main__':
         name = input("Process json name\n")
         ret = taskManger.process(name)
         print(ret)
+        wid = taskManger.get_wafer_id()
+        wid = "WaferId is:" + wid
+        print(wid)

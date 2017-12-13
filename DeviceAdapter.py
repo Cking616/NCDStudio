@@ -124,15 +124,17 @@ int     FuncGetErrorDescription(  void * objptr, int nError, char* strText, int 
         else:
             return None
 
-    def read_water_id(self):
+    def read_wafer_id(self):
         if not self.is_wid_manager_init:
             return None
         self.wid_lib.FuncProcessRead(self.wid_manager)
-        tmp_char = self.ffi.buffer(self.ffi.)
+        tmp_char = self.ffi.new("char []", "012345678912345".encode('utf-8'))
         ret_result = self.ffi.new('int *')
-        self.wid_lib.FuncGetWaterId(self.wid_manager, tmp_char, 16, ret_result)
-        water_id = self.ffi.string(tmp_char)
-        return water_id
+        self.wid_lib.FuncGetWaferId(self.wid_manager,  tmp_char, 16, ret_result)
+        wafer_id = self.ffi.string(tmp_char).decode('utf-8')
+        del tmp_char
+        del ret_result
+        return wafer_id
 
     def is_ready(self):
         return self.is_correct
@@ -142,12 +144,12 @@ if __name__ == '__main__':
     import json
     with open('init.json', 'r') as f:
         reads = f.read()
-        json_data = json.loads(reads)
-    deviceAdapter = DeviceAdapter(json_data)
+        _json_data = json.loads(reads)
+    deviceAdapter = DeviceAdapter(_json_data)
     while True:
         name = input("请输入发生的对象\n")
         # msg = input("请输入发送的内容\n")
         # deviceAdapter.send_message(name, msg)
         # rev = deviceAdapter.receive_message(name)
-        rev = deviceAdapter.read_water_id()
+        rev = deviceAdapter.read_wafer_id()
         print(rev)

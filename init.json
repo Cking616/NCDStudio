@@ -31,17 +31,21 @@
 			]
 		},
 		"widManager" : {
-			"libName" : "semi_wid110Lib.dll",
+			"libName" : "semi_wid110Lib_x64d.dll",
 			"isOpen" : true,
 			"address" : "192.168.1.1"
 		}
 	},
 	"MotionUnit" : {
-		"numOfMotionUnit" : 1,
+		"numOfMotionUnit" : 2,
 		"motionUnitList" : [
 			{
 				"type" : "SCARA",
 				"name" : "scara"
+			},
+			{
+				"type" : "WIDREADER",
+				"name" : "wid_reader"
 			},
 			{
 				"type" : "STEPMOTOR",
@@ -54,10 +58,6 @@
 			{
 				"type" : "STEPMOTOR",
 				"name" : "z_motion"
-			},
-			{
-				"type" : "WIDREADER",
-				"name" : "wid_reader"
 			}
 		]
 	}

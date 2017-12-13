@@ -10,7 +10,7 @@
 @time: 2017/12/12
 """
 
-import json
+
 import socket
 import cffi
 import os
@@ -18,21 +18,20 @@ import serial
 
 
 class DeviceAdapter:
-    def __init__(self, init_json_file):
+    def __init__(self, json_data):
         self.ffi = cffi.FFI()
         self.tcp_client_dict = {}
         self.serial_dict = {}
         self.wid_manager = None
-        with open(init_json_file, 'r') as f:
-            reads = f.read()
-            init_data = json.loads(reads)
-            device_adapter_data = init_data['DeviceAdapter']
+        self.is_correct = True
+        init_data = json_data
+        device_adapter_data = init_data['DeviceAdapter']
 
         # Tcp clients initialization
         tcp_client = device_adapter_data['tcpClient']
         num_of_tcp_client = tcp_client['numOfTcpClient']
         if num_of_tcp_client > 0:
-            tcp_client_data = tcp_client['tcpClients']
+            tcp_client_data = tcp_client['tcpClientList']
             for i in range(num_of_tcp_client):
                 tcp_address = tcp_client_data[i]['address']
                 tcp_port = tcp_client_data[i]['port']
@@ -46,11 +45,11 @@ class DeviceAdapter:
         serial_data = device_adapter_data['serial']
         num_of_serial = serial_data['numOfSerial']
         if num_of_serial > 0:
-            serials_data = serial_data['serials']
+            serial_list_data = serial_data['serialList']
             for i in range(num_of_serial):
-                serial_port = serials_data[i]['port']
-                serial_baud = serials_data[i]['baud']
-                serial_name = serials_data[i]['name']
+                serial_port = serial_list_data[i]['port']
+                serial_baud = serial_list_data[i]['baud']
+                serial_name = serial_list_data[i]['name']
                 tmp_serial = serial.Serial(port=serial_port, baudrate=serial_baud,
                                            bytesize=8, parity='E', stopbits=1, timeout=2)
                 if tmp_serial:
@@ -124,6 +123,19 @@ int     FuncGetErrorDescription(  void * objptr, int nError, char* strText, int 
             return _msg
         else:
             return None
+
+    def read_water_id(self):
+        if not self.is_wid_manager_init:
+            return None
+        self.wid_lib.FuncProcessRead(self.wid_manager)
+        tmp_char = self.ffi.new('char []', "123456789012345")
+        ret_result = self.ffi.new('int *')
+        self.wid_lib.FuncGetWaterId(self.wid_manager, tmp_char, 16, ret_result)
+        water_id = self.ffi.string(tmp_char)
+        return water_id
+
+    def is_ready(self):
+        return self.is_correct
 
 
 if __name__ == '__main__':

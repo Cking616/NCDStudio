@@ -2,11 +2,11 @@
 	"DeviceAdapter" : {
 		"tcpClient": {
 			"numOfTcpClient": 3,
-			"tcpClients" : [
+			"tcpClientList" : [
 				{
 					"address": "127.0.0.1",
 					"port": 6000,
-					"name": "x_motion"
+					"name": "scara"
 				},
 				{
 					"address": "127.0.0.1",
@@ -22,7 +22,7 @@
 		},
 		"serial" : {
 			"numOfSerial" : 0,
-			"serials" : [
+			"serialList" : [
 				{
 					"port" : "COM1",
 					"baud" : 9600,
@@ -34,5 +34,30 @@
 			"isOpen" : false,
 			"address" : "192.168.1.1"
 		}
+	},
+	"MotionUnit" : {
+		"numOfMotionUnit" : 0,
+		"motionUnitList" : [
+			{
+				"type" : "SCARA",
+				"name" : "scara"
+			},
+			{
+				"type" : "STEPMOTOR",
+				"name" : "x_motion"
+			},
+			{
+				"type" : "STEPMOTOR",
+				"name" : "y_motion"
+			},
+			{
+				"type" : "STEPMOTOR",
+				"name" : "z_motion"
+			},
+			{
+				"type" : "WIDREADER",
+				"name" : "wid_reader"
+			}
+		]
 	}
 }

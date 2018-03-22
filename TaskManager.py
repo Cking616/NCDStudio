@@ -28,9 +28,9 @@ class TaskManager:
             if self.unit_manager.is_ready():
                 self.is_correct = True
 
-    def process(self, process_json):
+    def process(self, process_py):
         return_value = True
-        with open(process_json, 'r') as f:
+        with open(process_py, 'r') as f:
             reads = f.read()
             json_data = json.loads(reads)
         process_cmd = json_data["processCMD"]

@@ -15,6 +15,50 @@ import socket
 import cffi
 import os
 import serial
+import asyncore
+
+
+class TCPClient(asyncore.dispatcher):
+    def __init__(self, host):
+        asyncore.dispatcher.__init__(self)
+        self.ready = False
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect(host)
+        self.write_buffer = ""
+        self.read_buffer = []
+
+    def handle_connect(self):
+        self.ready = True
+
+    def handle_close(self):
+        self.close()
+        self.ready = False
+
+    def handle_read(self):
+        read_data = self.recv(8192)
+        self.read_buffer.append(read_data)
+
+    def writable(self):
+        return len(self.write_buffer) > 0
+
+    def handle_write(self):
+        if isinstance(self.write_buffer, str):
+            send_num = self.send(self.write_buffer.encode('utf-8'))
+        else:
+            send_num = self.send(self.write_buffer)
+        self.write_buffer = self.write_buffer[send_num:]
+
+    def send_message(self, message):
+        if self.writable():
+            return False
+        self.write_buffer = message
+        return True
+
+    def receive_message(self):
+        return self.read_buffer.pop()
+
+    def is_ready(self):
+        return self.ready
 
 
 class DeviceAdapter:
@@ -36,10 +80,8 @@ class DeviceAdapter:
                 tcp_address = tcp_client_data[i]['address']
                 tcp_port = tcp_client_data[i]['port']
                 tcp_name = tcp_client_data[i]['name']
-                tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                ret = tcp_client.connect_ex((tcp_address, tcp_port))
-                if ret == 0:
-                    self.tcp_client_dict[tcp_name] = tcp_client
+                tcp_client = TCPClient((tcp_address, tcp_port))
+                self.tcp_client_dict[tcp_name] = tcp_client
 
         # Serial initialization
         serial_data = device_adapter_data['serial']
@@ -103,7 +145,7 @@ int     FuncGetErrorDescription(  void * objptr, int nError, char* strText, int 
     def send_message(self, _name, _msg):
         if _name in self.tcp_client_dict.keys():
             _client = self.tcp_client_dict[_name]
-            _ret = _client.send(_msg.encode('utf-8'))
+            _ret = _client.send_message(_msg)
             return _ret
         elif _name in self.serial_dict.keys():
             _serial = self.serial_dict[_name]
@@ -115,8 +157,7 @@ int     FuncGetErrorDescription(  void * objptr, int nError, char* strText, int 
     def receive_message(self, _name):
         if _name in self.tcp_client_dict.keys():
             _client = self.tcp_client_dict[_name]
-            _msg = _client.recv(8192)
-            _msg = _msg.decode('utf-8')
+            _msg = _client.receive_message()
             return _msg
         elif _name in self.serial_dict.keys():
             _msg = self.serial_dict[_name].readline()

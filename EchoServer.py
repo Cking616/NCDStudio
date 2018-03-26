@@ -9,10 +9,10 @@ class EchoHandler(BaseRequestHandler):
             if not msg:
                 break
             print(msg)
-            msg = "!E END-"
-            self.request.send(msg.encode('utf-8'))
+            msg = msg[1:]
+            self.request.send(msg)
 
 
 if __name__ == '__main__':
-    server = TCPServer(('127.0.0.1', 6000), EchoHandler)
+    server = TCPServer(('127.0.0.1', 6010), EchoHandler)
     server.serve_forever()

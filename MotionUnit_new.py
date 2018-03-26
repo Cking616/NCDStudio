@@ -15,35 +15,30 @@ import socket
 import threading
 
 
-class NanotecMotor(asyncore.dispatcher):
-    def __init__(self, host):
-        asyncore.dispatcher.__init__(self)
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect(host)
+class NanotecUnit:
+    def __init__(self):
         self.cmdBuffer = []
-        self.sendBuffer = []
-        self.error = ""
-        self.canSend = False
         self.lastSend = None
+        self.error = ""
+        self.sendBuffer = []
         self.lock = threading.RLock()
+        self.canSend = False
 
-    def handle_connect(self):
+    def on_connect(self):
         self.lock.acquire()
         self.canSend = True
         self.lock.release()
 
-    def handle_close(self):
+    def on_close(self):
         self.lock.acquire()
         self.canSend = False
         self.lock.release()
-        self.close()
 
-    def handle_read(self):
-        rec = self.recv(8192)
+    def on_read(self, rec):
         if rec == self.lastSend.encode('utf-8'):
             self.lock.acquire()
-            if self.lastSend != '1A\r':
-                self.canSend = True
+            # if self.lastSend != '1A\r':
+            self.canSend = True
             if self.cmdBuffer:
                 self.sendBuffer = self.cmdBuffer.pop()
                 self.lastSend = self.sendBuffer
@@ -62,12 +57,12 @@ class NanotecMotor(asyncore.dispatcher):
         else:
             return len(self.sendBuffer) > 0
 
-    def handle_write(self):
+    def on_write(self, send_func):
         if not self.sendBuffer:
             return
         if not self.canSend:
             return
-        sent = self.send(self.sendBuffer.encode('utf-8'))
+        sent = send_func(self.sendBuffer.encode('utf-8'))
         self.lock.acquire()
         self.sendBuffer = self.sendBuffer[sent:]
         self.lock.release()
@@ -97,11 +92,36 @@ class NanotecMotor(asyncore.dispatcher):
         return (not writable) and can_send
 
 
+class TCPClient(asyncore.dispatcher):
+    def __init__(self, host, unit):
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect(host)
+        self.unit = unit
+
+    def handle_connect(self):
+        self.unit.on_connect()
+
+    def handle_close(self):
+        self.unit.on_close()
+        self.close()
+
+    def handle_read(self):
+        rec = self.recv(8192)
+        self.unit.on_read(rec)
+
+    def writable(self):
+        return self.unit.writable()
+
+    def handle_write(self):
+        self.unit.on_write(self.send)
+
+
 if __name__ == '__main__':
     import time
-
-    # xMotor = NanotecMotor(('127.0.0.1', 6010))
-    xMotor = NanotecMotor(('192.168.100.254', 4004))
+    xMotor = NanotecUnit()
+    yMotor = NanotecUnit()
+    # xMotor = NanotecMotor(('192.168.100.254', 4004))
     # yMotor = NanotecMotor(('192.168.100.254', 4001))
 
     cmdPro = ['1A\r',
@@ -119,12 +139,11 @@ if __name__ == '__main__':
             threading.Thread.__init__(self)
 
         def run(self):
+            TCPClient(('127.0.0.1', 6010), xMotor)
             asyncore.loop()
 
     t = MyThread()
     t.start()
-    time.sleep(2)
-
     """
     yMotor.exec_cmd(cmdPro)
     while not yMotor.is_cmd_end():
@@ -142,11 +161,9 @@ if __name__ == '__main__':
               '1D\r',
               '1S\r']
     """
-
     xMotor.exec_cmd(cmdPro)
     while not xMotor.is_cmd_end():
-        time.sleep(1)
+        time.sleep(2)
 
     print("xMotor Home\n")
-
     input("Enter\n")

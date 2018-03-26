@@ -14,8 +14,37 @@ import asyncore
 import socket
 import threading
 
+from abc import ABCMeta, abstractmethod
 
-class NanotecUnit:
+
+class MotionUnit(metaclass=ABCMeta):
+    @abstractmethod
+    def on_connect(self):
+        pass
+
+    @abstractmethod
+    def on_close(self):
+        pass
+
+    @abstractmethod
+    def on_read(self):
+        pass
+
+    @abstractmethod
+    def writable(self):
+        pass
+
+    @abstractmethod
+    def on_write(self, send_func):
+        pass
+
+
+"""
+Nanotecs
+"""
+
+
+class NanotecUnit(MotionUnit):
     def __init__(self):
         self.cmdBuffer = []
         self.lastSend = None
@@ -92,6 +121,25 @@ class NanotecUnit:
         return (not writable) and can_send
 
 
+motor_home_cmd = ['1A\r',
+                  '1y1\r',
+                  '1:ramp_mode=2\r',
+                  '1J=1\r',
+                  '1:port_in_f=0\r',
+                  '1:port_in_e=7\r',
+                  '1:port_in_d=0\r',
+                  '1D\r',
+                  '1S\r']
+
+
+xmotor_after_home_cmd = ['1A\r', '1o=600\r', '1y2\r', '1:port_in_f=8\r', '1:port_in_e=0\r', '1:ramp_mode=0\r']
+
+
+"""
+TCPClient
+"""
+
+
 class TCPClient(asyncore.dispatcher):
     def __init__(self, host, unit):
         asyncore.dispatcher.__init__(self)
@@ -124,16 +172,6 @@ if __name__ == '__main__':
     # xMotor = NanotecMotor(('192.168.100.254', 4004))
     # yMotor = NanotecMotor(('192.168.100.254', 4001))
 
-    cmdPro = ['1A\r',
-              '1y1\r',
-              '1:ramp_mode=2\r',
-              '1J=1\r',
-              '1:port_in_f=0\r',
-              '1:port_in_e=7\r',
-              '1:port_in_d=0\r',
-              '1D\r',
-              '1S\r']
-
     class MyThread(threading.Thread):
         def __init__(self):
             threading.Thread.__init__(self)
@@ -144,24 +182,9 @@ if __name__ == '__main__':
 
     t = MyThread()
     t.start()
-    """
-    yMotor.exec_cmd(cmdPro)
-    while not yMotor.is_cmd_end():
-        time.sleep(2)
 
-    print("yMotor Home\n")
-
-    cmdPro = ['1A\r',
-              '1y1\r',
-              '1:ramp_mode=2\r',
-              '1J=1\r',
-              '1:port_in_f=0\r',
-              '1:port_in_e=7\r',
-              '1:port_in_d=0\r',
-              '1D\r',
-              '1S\r']
-    """
-    xMotor.exec_cmd(cmdPro)
+    tmp_cmd = motor_home_cmd.copy()
+    xMotor.exec_cmd(tmp_cmd)
     while not xMotor.is_cmd_end():
         time.sleep(2)
 

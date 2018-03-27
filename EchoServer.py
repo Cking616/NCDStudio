@@ -9,8 +9,13 @@ class EchoHandler(BaseRequestHandler):
             if not msg:
                 break
             print(msg)
-            msg = msg[1:]
-            self.request.send(msg)
+            if msg == 'HOME\n'.encode('utf-8'):
+                self.request.send('!E END-HOME HOME\n'.encode('utf-8'))
+            elif msg == 'WOB\n'.encode('utf-8'):
+                self.request.send('!S WOB 7\n!E END-WOB 2 WOB\n'.encode('utf-8'))
+            else:
+                msg = msg[1:]
+                self.request.send(msg)
 
 
 if __name__ == '__main__':

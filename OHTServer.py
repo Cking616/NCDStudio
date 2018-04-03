@@ -2,9 +2,11 @@ import time
 import asyncore
 import socket
 import threading
+import ctypes
+import inspect
 
 recCMD = ""
-writeCMD = ""
+writeCMDBuffer = []
 revCondition = threading.Condition()
 isConnected = False
 zEncoder = 0
@@ -12,6 +14,27 @@ wheelEncoder = 0
 motorStatus = False
 cmdError = False
 gFlag = 0
+isEndTimer = False
+
+
+def parser_receive(receive):
+    global gFlag
+    global cmdError
+    if receive[:9] == 'ERR Flags':
+        gFlag = 0
+        return True
+    elif receive[:6] == 'Flags:':
+        cmd = receive.split()
+        dn = cmd[2]
+        gFlag = int(dn[-2])
+        return True
+    elif receive == 'ERROR-CMD':
+        cmdError = True
+        return True
+    elif receive[-1] == '.':
+        return True
+    else:
+        return False
 
 
 class OhtHandler(asyncore.dispatcher_with_send):
@@ -22,12 +45,9 @@ class OhtHandler(asyncore.dispatcher_with_send):
         revCondition.acquire()
         data = self.recv(1024)
         if data:
+            recCMD = ""
             tmp_rec = data.decode('utf-8')
-            if tmp_rec[:3] == 'ERR':
-                cmdError = True
-            elif tmp_rec[:6] == 'Flags:':
-                gFlag = 1
-            else:
+            if not parser_receive(tmp_rec):
                 recCMD = tmp_rec
                 revCondition.notify()
         revCondition.release()
@@ -40,11 +60,14 @@ class OhtHandler(asyncore.dispatcher_with_send):
         return True
 
     def handle_write(self):
-        global writeCMD
-        if not writeCMD:
+        global writeCMDBuffer
+        if not writeCMDBuffer:
             return
-        self.send(writeCMD.encode('utf-8'))
-        writeCMD = ""
+        cmd = writeCMDBuffer.pop(0)
+        self.send(cmd.encode('utf-8'))
+        while writeCMDBuffer:
+            cmd = writeCMDBuffer.pop(0)
+            self.send(cmd.encode('utf-8'))
 
 
 class OhtServer(asyncore.dispatcher):
@@ -65,11 +88,13 @@ class OhtServer(asyncore.dispatcher):
 
 
 class OhtServerThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, address, port):
         threading.Thread.__init__(self)
+        self.address = address
+        self.port = port
 
     def run(self):
-        server = OhtServer('192.168.0.181', 5000)
+        server = OhtServer(self.address, self.port)
         asyncore.loop()
 
 
@@ -106,93 +131,114 @@ class LoopTimer(_Timer):
 
 
 def timer_thread():
+    global isConnected
+    global isEndTimer
+    if isEndTimer:
+        return
     if not isConnected:
         return
 
-    global writeCMD
+    global writeCMDBuffer
     global zEncoder
     global wheelEncoder
     global motorStatus
-    writeCMD = 'E9'
+    global recCMD
+    writeCMDBuffer.append('E9')
     revCondition.acquire()
-    revCondition.wait()
-    wheel_encoder = recCMD
-    wheelEncoder = wheel_encoder.split()[0]
-    wheelEncoder = wheelEncoder[2:]
-    wheelEncoder = int(wheelEncoder)
+    ret = revCondition.wait(5)
+    if not ret:
+        writeCMDBuffer.append('E9')
+        ret = revCondition.wait(5)
+    if ret:
+        wheel_encoder = recCMD
+        wheelEncoder = wheel_encoder.split()[0]
+        if wheelEncoder[1] == ':':
+            wheelEncoder = wheelEncoder[2:]
+            wheelEncoder = int(wheelEncoder)
     revCondition.release()
     # print(wheelEncoder)
     # print('Wheel Encoder: %s' % wheel_encoder)
 
-    writeCMD = 'P2G6064'
+    writeCMDBuffer.append('P2G6064')
     revCondition.acquire()
-    revCondition.wait()
-    z_encoder = recCMD
-    zEncoder = int(z_encoder)
+    ret = revCondition.wait(5)
+    if not ret:
+        writeCMDBuffer.append('P2G6064')
+        ret = revCondition.wait(5)
+    if ret:
+        if len(recCMD) < 2 or recCMD[1] != ':':
+            z_encoder = recCMD
+            zEncoder = int(z_encoder)
     revCondition.release()
-    print("z:%d" % zEncoder)
+    # print("z:%d" % zEncoder)
     # print('Z Encoder: %s' % z_encoder)
 
-    writeCMD = 'D'
+    writeCMDBuffer.append('D')
     revCondition.acquire()
-    revCondition.wait()
-    motor_status = recCMD
-    if motor_status[:3] == '3ii':
-        motorStatus = True
-    else:
-        motorStatus = False
+    ret = revCondition.wait(5)
+    if not ret:
+        writeCMDBuffer.append('D')
+        ret = revCondition.wait(5)
+    if ret:
+        if recCMD[3] == ',':
+            motor_status = recCMD
+            if motor_status[:3] == '3ii':
+                motorStatus = True
+            elif motor_status[:3] == '3di':
+                motorStatus = True
+            else:
+                motorStatus = False
     revCondition.release()
     # print(motorStatus)
     # print('Motor Status: %s' % motor_status)
 
 
 def init_controller():
-    global writeCMD
-    writeCMD = 'P41'
-    time.sleep(0.3)
-    writeCMD = 'P4P460FE65537'
-    time.sleep(0.3)
-    writeCMD = 'P21'
+    global motorStatus
+    while not motorStatus:
+        time.sleep(1)
+        print("Wait for Motor init")
+    global writeCMDBuffer
+    writeCMDBuffer.append('P41')
+    time.sleep(0.2)
+    writeCMDBuffer.append('P4P460FE65537')
+    time.sleep(0.2)
+    writeCMDBuffer.append('P21')
+    time.sleep(2)
+    print("Motor initialized")
 
 
-def go_wheel_location(encoder):
-    global wheelEncoder
-    error_pos = wheelEncoder - encoder
-    if error_pos > 0:
-        direction = 0
-    else:
-        direction = 1
-        error_pos = - error_pos
+def go_wheel_location(flag, encoder):
+    global gFlag
+    if gFlag == 0:
+        print("Flags Error, Reset Flag")
+        return False
 
-    global writeCMD
-
-    if error_pos <= 300:
-        writeCMD = 'm9fb72000'
-        return True
+    global writeCMDBuffer
 
     while True:
         if error_pos > 20000:
-            pwd = 60
+            pwd = 45
             run_time = 1000
         elif 10000 < error_pos <= 20000:
-            pwd = 60
-            run_time = 500
-        elif 5000 < error_pos <= 10000:
-            pwd = 50
-            run_time = 500
-        elif 1000 < error_pos <= 5000:
             pwd = 40
             run_time = 500
-        else:
-            pwd = 35
+        elif 5000 < error_pos <= 10000:
+            pwd = 30
             run_time = 500
+        elif 1000 < error_pos <= 5000:
+            pwd = 25
+            run_time = 500
+        else:
+            pwd = 25
+            run_time = 300
         if direction:
             cmd = 'm9fg%d%d' % (pwd, run_time)
         else:
             cmd = 'm9rg%d%d' % (pwd, run_time)
 
-        writeCMD = cmd
-        time.sleep(1.3)
+        writeCMDBuffer.append(cmd)
+        time.sleep(0.75)
 
         error_pos = wheelEncoder - encoder
         if error_pos > 0:
@@ -201,25 +247,48 @@ def go_wheel_location(encoder):
             direction = 1
             error_pos = - error_pos
 
-        if error_pos <= 1000:
-            writeCMD = 'm9fb72000'
+        # print('Err: %d' % error_pos)
+        if error_pos <= 700:
+            writeCMDBuffer.append('m9fb72000')
             return True
 
 
 def out_expand(mm):
     num = mm * 100
     cmd = "P4M-%d" % num
-    global writeCMD
-    writeCMD = cmd
+    global writeCMDBuffer
+    writeCMDBuffer.append(cmd)
+    time.sleep(0.5)
+    writeCMDBuffer.append(cmd)
     time.sleep(10)
 
 
 def in_expand(mm):
     num = mm * 100
     cmd = "P4M%d" % num
-    global writeCMD
-    writeCMD = cmd
+    global writeCMDBuffer
+    writeCMDBuffer.append(cmd)
+    time.sleep(0.5)
+    writeCMDBuffer.append(cmd)
     time.sleep(10)
+
+
+def grip():
+    cmd = 'm630t3700'
+    global writeCMDBuffer
+    writeCMDBuffer.append(cmd)
+    time.sleep(0.5)
+    writeCMDBuffer.append(cmd)
+    time.sleep(5)
+
+
+def release():
+    cmd = 'm631t3700'
+    global writeCMDBuffer
+    writeCMDBuffer.append(cmd)
+    time.sleep(0.5)
+    writeCMDBuffer.append(cmd)
+    time.sleep(5)
 
 
 def go_z_location(encoder):
@@ -231,12 +300,12 @@ def go_z_location(encoder):
         direction = 1
         error_pos = - error_pos
 
-    global writeCMD
+    global writeCMDBuffer
 
     if error_pos <= 200:
-        writeCMD = 'P2P460FE1'
+        writeCMDBuffer.append('P2P460FE1')
         time.sleep(0.2)
-        writeCMD = 'P2P260407'
+        writeCMDBuffer.append('P2P260407')
         return True
 
     if direction:
@@ -244,26 +313,67 @@ def go_z_location(encoder):
     else:
         cmd = 'P2V-10'
 
-    writeCMD = cmd
+    while writeCMDBuffer:
+        time.sleep(0.1)
+    writeCMDBuffer.append(cmd)
     time.sleep(0.7)
-    writeCMD = 'P2P460FE196609'
+    writeCMDBuffer.append('P2P460FE196609')
     time.sleep(0.2)
     while True:
         error_pos = zEncoder - encoder
-        if error_pos < 0:
+        if error_pos > 0:
+            direction = 0
+        else:
+            direction = 1
             error_pos = - error_pos
 
-        if error_pos <= 300:
-            writeCMD = 'P2P460FE1'
-            time.sleep(0.3)
-            writeCMD = 'P2P260407'
+        if direction:
+            cmd = 'P2V10'
+        else:
+            cmd = 'P2V-10'
+        # print('Err: %d' % error_pos)
+        if error_pos <= 500:
+            writeCMDBuffer.append('P2P460FE1')
+            time.sleep(0.5)
+            writeCMDBuffer.append('P2P260407')
+            time.sleep(0.5)
+            writeCMDBuffer.append('P2P460FE1')
+            time.sleep(0.5)
+            writeCMDBuffer.append('P2P260407')
+            time.sleep(0.5)
+            writeCMDBuffer.append('P2P460FE1')
+            time.sleep(0.5)
+            writeCMDBuffer.append('P2P260407')
             return True
-        time.sleep(0.75)
+        else:
+            time.sleep(0.2)
+            writeCMDBuffer.append(cmd)
+            time.sleep(0.2)
+            writeCMDBuffer.append('P2P460FE196609')
+        time.sleep(0.5)
 
 
-def init_servers():
-    OhtServerThread().start()
-    time.sleep(1.5)
-    timer_pro = LoopTimer(0.5, timer_thread)
-    timer_pro.start()
-    time.sleep(3)
+def stop_z():
+    writeCMDBuffer.append('P2P460FE1')
+    time.sleep(0.2)
+    writeCMDBuffer.append('P2P260407')
+    time.sleep(0.3)
+
+
+def _async_raise(tid, exc_type):
+    """raises the exception, performs cleanup if needed"""
+    tid = ctypes.c_long(tid)
+    if not inspect.isclass(exc_type):
+        exc_type = type(exc_type)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exc_type))
+    if res == 0:
+        raise ValueError("invalid thread id")
+    elif res != 1:
+        # """if it returns a number greater than one, you're in trouble,
+        # and you should call it again with exc=NULL to revert the effect"""
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
+
+def stop_thread(thread):
+    _async_raise(thread.ident, SystemExit)

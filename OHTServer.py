@@ -15,6 +15,7 @@ motorStatus = False
 cmdError = False
 gFlag = 0
 isEndTimer = False
+rampState = 0
 
 
 def parser_receive(receive):
@@ -28,10 +29,13 @@ def parser_receive(receive):
         dn = cmd[2]
         gFlag = int(dn[-2])
         return True
-    elif receive == 'ERROR-CMD':
+    elif receive[:6] == 'ERROR-':
         cmdError = True
         return True
     elif receive[-1] == '.':
+        tmp_state = receive.split(',')[1]
+        global rampState
+        rampState = int(tmp_state)
         return True
     else:
         return False
@@ -195,62 +199,82 @@ def timer_thread():
 
 def init_controller():
     global motorStatus
-    while not motorStatus:
-        time.sleep(1)
-        print("Wait for Motor init")
     global writeCMDBuffer
     writeCMDBuffer.append('P41')
     time.sleep(0.2)
     writeCMDBuffer.append('P4P460FE65537')
     time.sleep(0.2)
     writeCMDBuffer.append('P21')
-    time.sleep(2)
+    while not motorStatus:
+        time.sleep(1)
+        writeCMDBuffer.append('D')
+        revCondition.acquire()
+        ret = revCondition.wait(5)
+        if not ret:
+            writeCMDBuffer.append('D')
+            ret = revCondition.wait()
+        if ret:
+            if recCMD[3] == ',':
+                motor_status = recCMD
+                if motor_status[:3] == '3ii':
+                    motorStatus = True
+                elif motor_status[:3] == '3di':
+                    motorStatus = True
+                else:
+                    motorStatus = False
+        revCondition.release()
+        print("Wait for Motor init")
     print("Motor initialized")
 
 
-def go_wheel_location(flag, encoder):
+def scan_flags():
+    global writeCMDBuffer
+    global wheelEncoder
+    global motorStatus
+    global recCMD
+    global gFlag
+    writeCMDBuffer.append('E9')
+    revCondition.acquire()
+    ret = revCondition.wait(5)
+    if not ret:
+        writeCMDBuffer.append('E9')
+        ret = revCondition.wait()
+    if ret:
+        wheel_encoder = recCMD
+        wheelEncoder = wheel_encoder.split()[4]
+        if wheelEncoder[-2] == '1':
+            gFlag = 1
+        else:
+            gFlag = 0
+    revCondition.release()
+
+    while not gFlag:
+        writeCMDBuffer.append('m9fg451000')
+        time.sleep(1.2)
+        print("Scanning")
+
+
+def go_wheel_location(speed, flag, encoder):
     global gFlag
     if gFlag == 0:
         print("Flags Error, Reset Flag")
         return False
 
     global writeCMDBuffer
+    global rampState
+    if speed > 70:
+        speed = 70
+    if speed < 10:
+        speed = 10
 
-    while True:
-        if error_pos > 20000:
-            pwd = 45
-            run_time = 1000
-        elif 10000 < error_pos <= 20000:
-            pwd = 40
-            run_time = 500
-        elif 5000 < error_pos <= 10000:
-            pwd = 30
-            run_time = 500
-        elif 1000 < error_pos <= 5000:
-            pwd = 25
-            run_time = 500
-        else:
-            pwd = 25
-            run_time = 300
-        if direction:
-            cmd = 'm9fg%d%d' % (pwd, run_time)
-        else:
-            cmd = 'm9rg%d%d' % (pwd, run_time)
-
-        writeCMDBuffer.append(cmd)
-        time.sleep(0.75)
-
-        error_pos = wheelEncoder - encoder
-        if error_pos > 0:
-            direction = 0
-        else:
-            direction = 1
-            error_pos = - error_pos
-
-        # print('Err: %d' % error_pos)
-        if error_pos <= 700:
-            writeCMDBuffer.append('m9fb72000')
-            return True
+    cmd = 'r91f%02d%d%d' % (speed, flag, encoder)
+    writeCMDBuffer.append(cmd)
+    rampState = 1
+    time.sleep(1)
+    while rampState:
+        time.sleep(1)
+        print("Doing")
+    return True
 
 
 def out_expand(mm):
@@ -291,66 +315,39 @@ def release():
     time.sleep(5)
 
 
-def go_z_location(encoder):
-    global zEncoder
-    error_pos = zEncoder - encoder
-    if error_pos > 0:
-        direction = 0
-    else:
-        direction = 1
-        error_pos = - error_pos
+def go_z_location(speed, encoder):
+    global gFlag
+    if gFlag == 0:
+        print("Flags Error, Reset Flag")
+        return False
 
     global writeCMDBuffer
-
-    if error_pos <= 200:
-        writeCMDBuffer.append('P2P460FE1')
-        time.sleep(0.2)
-        writeCMDBuffer.append('P2P260407')
-        return True
-
-    if direction:
-        cmd = 'P2V10'
-    else:
-        cmd = 'P2V-10'
-
-    while writeCMDBuffer:
-        time.sleep(0.1)
+    cmd = 'P2A%03d%d' % (speed, encoder)
     writeCMDBuffer.append(cmd)
-    time.sleep(0.7)
-    writeCMDBuffer.append('P2P460FE196609')
-    time.sleep(0.2)
-    while True:
-        error_pos = zEncoder - encoder
-        if error_pos > 0:
-            direction = 0
-        else:
-            direction = 1
-            error_pos = - error_pos
+    time.sleep(0.5)
 
-        if direction:
-            cmd = 'P2V10'
-        else:
-            cmd = 'P2V-10'
-        # print('Err: %d' % error_pos)
-        if error_pos <= 500:
-            writeCMDBuffer.append('P2P460FE1')
-            time.sleep(0.5)
-            writeCMDBuffer.append('P2P260407')
-            time.sleep(0.5)
-            writeCMDBuffer.append('P2P460FE1')
-            time.sleep(0.5)
-            writeCMDBuffer.append('P2P260407')
-            time.sleep(0.5)
-            writeCMDBuffer.append('P2P460FE1')
-            time.sleep(0.5)
-            writeCMDBuffer.append('P2P260407')
-            return True
-        else:
-            time.sleep(0.2)
-            writeCMDBuffer.append(cmd)
-            time.sleep(0.2)
-            writeCMDBuffer.append('P2P460FE196609')
-        time.sleep(0.5)
+    while True:
+        writeCMDBuffer.append('P2G6064')
+        revCondition.acquire()
+        ret = revCondition.wait(5)
+        if not ret:
+            writeCMDBuffer.append('P2G6064')
+            revCondition.wait()
+            z_encoder = recCMD
+            cur_encoder = int(z_encoder)
+        revCondition.release()
+        err = encoder - cur_encoder
+        if -300 < err < 300:
+            break
+        print("Doing, Err:%d" % err)
+        time.sleep(0.75)
+
+
+def stop_wheel():
+    writeCMDBuffer.append('r9tf000')
+    time.sleep(0.3)
+    writeCMDBuffer.append('m9fb72000')
+    time.sleep(0.2)
 
 
 def stop_z():

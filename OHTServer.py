@@ -198,8 +198,12 @@ def timer_thread():
 
 
 def init_controller():
+    global isConnected
     global motorStatus
     global writeCMDBuffer
+    while not isConnected:
+        print("Wait for controller connect")
+        time.sleep(1.5)
     writeCMDBuffer.append('P41')
     time.sleep(0.2)
     writeCMDBuffer.append('P4P460FE65537')
@@ -224,7 +228,6 @@ def init_controller():
                     motorStatus = False
         revCondition.release()
         print("Wait for Motor init")
-    print("Motor initialized")
 
 
 def scan_flags():
@@ -249,8 +252,23 @@ def scan_flags():
     revCondition.release()
 
     while not gFlag:
-        writeCMDBuffer.append('m9fg451000')
-        time.sleep(1.2)
+        writeCMDBuffer.append('m9fg501000')
+        time.sleep(0.5)
+        writeCMDBuffer.append('E9')
+        revCondition.acquire()
+        ret = revCondition.wait(5)
+        if not ret:
+            writeCMDBuffer.append('E9')
+            ret = revCondition.wait()
+        if ret:
+            wheel_encoder = recCMD
+            wheelEncoder = wheel_encoder.split()[4]
+            if wheelEncoder[-2] == '1':
+                gFlag = 1
+            else:
+                gFlag = 0
+        revCondition.release()
+        time.sleep(0.5)
         print("Scanning")
 
 
@@ -267,7 +285,7 @@ def go_wheel_location(speed, flag, encoder):
     if speed < 10:
         speed = 10
 
-    cmd = 'r91f%02d%d%d' % (speed, flag, encoder)
+    cmd = 'r9lf%02d%d%d' % (speed, flag, encoder)
     writeCMDBuffer.append(cmd)
     rampState = 1
     time.sleep(1)
@@ -323,10 +341,12 @@ def go_z_location(speed, encoder):
 
     global writeCMDBuffer
     cmd = 'P2A%03d%d' % (speed, encoder)
-    writeCMDBuffer.append(cmd)
+    writeCMDBuffer.append('P2P460FE196609')
     time.sleep(0.5)
-
+    writeCMDBuffer.append(cmd)
+    time.sleep(0.2)
     while True:
+        cur_encoder = 0
         writeCMDBuffer.append('P2G6064')
         revCondition.acquire()
         ret = revCondition.wait(5)
@@ -340,7 +360,10 @@ def go_z_location(speed, encoder):
         if -300 < err < 300:
             break
         print("Doing, Err:%d" % err)
-        time.sleep(0.75)
+        writeCMDBuffer.append(cmd)
+        time.sleep(0.5)
+        writeCMDBuffer.append('P2P460FE196609')
+        time.sleep(0.2)
 
 
 def stop_wheel():

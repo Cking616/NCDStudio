@@ -268,7 +268,7 @@ def scan_flags():
             else:
                 gFlag = 0
         revCondition.release()
-        time.sleep(0.5)
+        time.sleep(0.2)
         print("Scanning")
 
 
@@ -357,7 +357,8 @@ def go_z_location(speed, encoder):
             cur_encoder = int(z_encoder)
         revCondition.release()
         err = encoder - cur_encoder
-        if -300 < err < 300:
+        if -200 < err < 200:
+            stop_z()
             break
         print("Doing, Err:%d" % err)
         writeCMDBuffer.append(cmd)

@@ -296,23 +296,91 @@ def go_wheel_location(speed, flag, encoder):
 
 
 def out_expand(mm):
-    num = mm * 100
-    cmd = "P4M-%d" % num
     global writeCMDBuffer
-    writeCMDBuffer.append(cmd)
-    time.sleep(0.5)
-    writeCMDBuffer.append(cmd)
-    time.sleep(10)
+    cur_encoder = 0
+    writeCMDBuffer.append('P4G6064')
+    revCondition.acquire()
+    ret = revCondition.wait(5)
+    if not ret:
+        writeCMDBuffer.append('P4G6064')
+        revCondition.wait()
+        z_encoder = recCMD
+        cur_encoder = int(z_encoder)
+    revCondition.release()
+
+    num = mm * 100
+    target_p = cur_encoder - num
+    _dir = 1
+    while True:
+        if _dir:
+            cmd = "P4M-300"
+        else:
+            cmd = "P4M300"
+        writeCMDBuffer.append(cmd)
+        time.sleep(0.7)
+
+        writeCMDBuffer.append('P4G6064')
+        revCondition.acquire()
+        ret = revCondition.wait(3)
+        if not ret:
+            writeCMDBuffer.append('P4G6064')
+            revCondition.wait()
+            z_encoder = recCMD
+            cur_encoder = int(z_encoder)
+        revCondition.release()
+
+        err = target_p - cur_encoder
+        if err > 0:
+            _dir = 0
+        else:
+            _dir = 1
+            err = -err
+        if err < 400:
+            break
 
 
 def in_expand(mm):
-    num = mm * 100
-    cmd = "P4M%d" % num
     global writeCMDBuffer
-    writeCMDBuffer.append(cmd)
-    time.sleep(0.5)
-    writeCMDBuffer.append(cmd)
-    time.sleep(10)
+    cur_encoder = 0
+    writeCMDBuffer.append('P4G6064')
+    revCondition.acquire()
+    ret = revCondition.wait(5)
+    if not ret:
+        writeCMDBuffer.append('P4G6064')
+        revCondition.wait()
+        z_encoder = recCMD
+        cur_encoder = int(z_encoder)
+    revCondition.release()
+
+    num = mm * 100
+    target_p = cur_encoder + num
+    _dir = 0
+    while True:
+        if _dir:
+            cmd = "P4M-300"
+        else:
+            cmd = "P4M300"
+        writeCMDBuffer.append(cmd)
+        time.sleep(0.7)
+
+        writeCMDBuffer.append('P4G6064')
+        revCondition.acquire()
+        ret = revCondition.wait(3)
+        if not ret:
+            writeCMDBuffer.append('P4G6064')
+            revCondition.wait()
+            z_encoder = recCMD
+            cur_encoder = int(z_encoder)
+        revCondition.release()
+
+        err = target_p - cur_encoder
+        if err > 0:
+            _dir = 0
+        else:
+            _dir = 1
+            err = -err
+        if err < 400:
+            break
 
 
 def grip():
@@ -357,7 +425,7 @@ def go_z_location(speed, encoder):
             cur_encoder = int(z_encoder)
         revCondition.release()
         err = encoder - cur_encoder
-        if -200 < err < 200:
+        if -300 < err < 300:
             stop_z()
             break
         print("Doing, Err:%d" % err)

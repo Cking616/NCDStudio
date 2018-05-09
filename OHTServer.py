@@ -399,8 +399,8 @@ def go_z_location(speed, encoder):
         if not ret:
             writeCMDBuffer.append('P2G6064')
             revCondition.wait()
-            z_encoder = recCMD
-            cur_encoder = int(z_encoder)
+        z_encoder = recCMD
+        cur_encoder = int(z_encoder)
         revCondition.release()
         err = encoder - cur_encoder
         if -500 < err < 500:

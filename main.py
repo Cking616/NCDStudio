@@ -15,28 +15,29 @@ import threading
 
 # 轮子使用速度，理论(0~79),实测低于40会有卡住的情况
 # 高于60较危险，故这个脚本中统一取45
-wheel_speed = 55
+wheel_speed = 60
 
 # 定义x轴三个点
-# 1 号点定义参考以0号flag为参考，坐标偏差100个编码器单位
-wheel_point1_flag = 0
-wheel_point1_encoder = 100
-# 2 号点定义参考以1号flag为参考，坐标偏差-100个编码器单位
+# 1 号点定义参考以0号flag为参考，坐标偏差-200个编码器单位
+wheel_point1_flag = 1
+wheel_point1_encoder = 8200
+# 2 号点定义参考以1号flag为参考，坐标偏差100个编码器单位
 wheel_point2_flag = 1
-wheel_point2_encoder = -100
+wheel_point2_encoder = 38600
 # 3 号点定义参考以2号flag为参考，坐标偏差100个编码器单位
 wheel_point3_flag = 2
-wheel_point3_encoder = 100
+wheel_point3_encoder = 15000
 
 # 定义Z轴两个点
 # 由于Z轴定位偏差实测至少有300个编码器单位，故取高位点为300
 # Z轴向下为正，且为相对编码器取每次上电时的坐标为坐标0点，故为了计算方便定义一个相对坐标0点
 # X轴做扫描后会自动按Flag处理坐标0点，故不用做相关处理
 zZero = 0
-zPoint1 = zZero + 5500
-zPoint2 = zZero + 600
+zPoint1 = zZero + 5000
+zPoint2 = zZero - 500
+zPoint3 = zZero + 6500
 # 目前取Z速度为20，范围为（0~200）
-zSpeed = 20
+zSpeed = 50
 
 # 定义Y行程，860mm为完全伸出
 YPoint = 860
@@ -47,6 +48,73 @@ address = '192.168.0.181'
 port = 5000
 
 
+def pick(wf, we, zd):
+    print("Wheel go to wheelPoint")
+    Oht.go_wheel_location(wheel_speed, wf, we)
+    print("Done")
+
+    time.sleep(0.6)
+
+    print("Out expand")
+    Oht.out_expand(450, YPoint)
+    print("Done")
+
+    time.sleep(0.6)
+
+    print("Z go to zPoint1")
+    Oht.go_z_location(zSpeed, zd)
+    print("Done")
+
+    time.sleep(0.6)
+
+    print("Grip")
+    Oht.grip()
+    print("Done")
+
+    time.sleep(0.6)
+    print("Z go to zPoint2")
+    Oht.go_z_location(zSpeed, zPoint2)
+    print("Done")
+
+    time.sleep(0.6)
+    print("In expand")
+    Oht.in_expand(450, YPoint)
+    print("Done")
+
+
+def place(wf, we, zd):
+    print("Wheel go to wheelPoint")
+    Oht.go_wheel_location(wheel_speed, wf, we)
+    print("Done")
+
+    time.sleep(0.6)
+
+    print("Out expand")
+    Oht.out_expand(450, YPoint)
+    print("Done")
+
+    time.sleep(0.6)
+
+    print("Z go to zPoint1")
+    Oht.go_z_location(zSpeed, zd)
+    print("Done")
+
+    time.sleep(0.6)
+    print("Release")
+    Oht.release()
+    print("Done")
+
+    time.sleep(0.6)
+    print("Z go to zPoint2")
+    Oht.go_z_location(zSpeed, zPoint2)
+    print("Done")
+
+    time.sleep(0.6)
+    print("In expand")
+    Oht.in_expand(450, YPoint)
+    print("Done")
+
+
 def main_thread():
     Oht.init_controller()
     print("Motor initialized")
@@ -55,58 +123,33 @@ def main_thread():
     print("Scan flags")
     Oht.scan_flags()
     print("Done")
+    time.sleep(1)
 
-    time.sleep(2)
-
-    print("Wheel go to wheelPoint1")
-    Oht.go_wheel_location(wheel_speed, wheel_point1_flag, wheel_point1_encoder)
-    print("Done")
-
-    time.sleep(2)
-
-    print("Wheel go to wheelPoint2")
-    Oht.go_wheel_location(wheel_speed, wheel_point2_flag, wheel_point2_encoder)
-    print("Done")
-
-    time.sleep(2)
-
-    print("Out expand")
-    Oht.out_expand(YPoint)
-    print("Done")
-
-    time.sleep(2)
-
-    print("Z go to zPoint1")
-    Oht.go_z_location(zSpeed, zPoint1)
-    print("Done")
-
-    time.sleep(2)
-
-    print("Grip")
-    Oht.grip()
-    print("Done")
-
-    time.sleep(2)
-    print("Release")
-    Oht.release()
-    print("Done")
-
-    time.sleep(2)
-    print("Z go to zPoint2")
-    Oht.go_z_location(zSpeed, zPoint2)
-    print("Done")
-
-    time.sleep(2)
-    print("In expand")
-    Oht.in_expand(YPoint)
-    print("Done")
-
-    time.sleep(2)
-    print("Wheel go to wheelPoint3")
-    Oht.go_wheel_location(wheel_speed, wheel_point3_flag, wheel_point3_encoder)
-    print("Done")
-
-    print("结束请按Enter退出")
+    while True:
+        print("Go wheel Point3")
+        Oht.go_wheel_location(wheel_speed, wheel_point3_flag, wheel_point3_encoder)
+        print("Done")
+        time.sleep(0.6)
+        pick(wheel_point2_flag, wheel_point2_encoder, zPoint3)
+        time.sleep(0.6)
+        print("Go wheel Point3")
+        Oht.go_wheel_location(wheel_speed, wheel_point3_flag, wheel_point3_encoder)
+        print("Done")
+        time.sleep(0.6)
+        place(wheel_point1_flag, wheel_point1_encoder, zPoint1)
+        time.sleep(0.6)
+        print("Go wheel Point3")
+        Oht.go_wheel_location(wheel_speed, wheel_point3_flag, wheel_point3_encoder)
+        print("Done")
+        time.sleep(0.6)
+        pick(wheel_point1_flag, wheel_point1_encoder, zPoint1)
+        time.sleep(0.6)
+        print("Go wheel Point3")
+        Oht.go_wheel_location(wheel_speed, wheel_point3_flag, wheel_point3_encoder)
+        print("Done")
+        time.sleep(0.6)
+        place(wheel_point2_flag, wheel_point2_encoder, zPoint3)
+        time.sleep(0.6)
 
 
 if __name__ == '__main__':

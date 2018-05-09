@@ -228,6 +228,10 @@ def init_controller():
                     motorStatus = False
         revCondition.release()
         print("Wait for Motor init")
+    writeCMDBuffer.append('P2P460FE196609')
+    time.sleep(0.5)
+    writeCMDBuffer.append('P22')
+    time.sleep(0.5)
 
 
 def scan_flags():
@@ -252,8 +256,8 @@ def scan_flags():
     revCondition.release()
 
     while not gFlag:
-        writeCMDBuffer.append('m9fg501000')
-        time.sleep(0.5)
+        writeCMDBuffer.append('m9fg601500')
+        time.sleep(0.3)
         writeCMDBuffer.append('E9')
         revCondition.acquire()
         ret = revCondition.wait(5)
@@ -268,7 +272,7 @@ def scan_flags():
             else:
                 gFlag = 0
         revCondition.release()
-        time.sleep(0.2)
+        time.sleep(0.3)
         print("Scanning")
 
 
@@ -295,7 +299,51 @@ def go_wheel_location(speed, flag, encoder):
     return True
 
 
-def out_expand(mm):
+def go_y_location(speed, encoder):
+    global gFlag
+    if gFlag == 0:
+        print("Flags Error, Reset Flag")
+        return False
+
+    global writeCMDBuffer
+    cmd = 'P4A%03d%d' % (speed, encoder)
+    writeCMDBuffer.append(cmd)
+    time.sleep(0.2)
+    while True:
+        writeCMDBuffer.append('P4G6064')
+        revCondition.acquire()
+        ret = revCondition.wait(5)
+        if not ret:
+            writeCMDBuffer.append('P4G6064')
+            revCondition.wait()
+        y_encoder = recCMD
+        cur_encoder = int(y_encoder)
+        revCondition.release()
+        err = encoder - cur_encoder
+        if -300 < err < 300:
+            break
+        writeCMDBuffer.append(cmd)
+        time.sleep(1.2)
+
+
+def out_expand(speed, mm):
+    global writeCMDBuffer
+    writeCMDBuffer.append('P4G6064')
+    revCondition.acquire()
+    ret = revCondition.wait(5)
+    if not ret:
+        writeCMDBuffer.append('P4G6064')
+        revCondition.wait()
+    y_encoder = recCMD
+    cur_encoder = int(y_encoder)
+    revCondition.release()
+    num = mm * 100
+    encoder = cur_encoder - num
+    go_y_location(speed, 0)
+    time.sleep(0.5)
+
+
+def in_expand(speed, mm):
     global writeCMDBuffer
     cur_encoder = 0
     writeCMDBuffer.append('P4G6064')
@@ -304,83 +352,13 @@ def out_expand(mm):
     if not ret:
         writeCMDBuffer.append('P4G6064')
         revCondition.wait()
-        z_encoder = recCMD
-        cur_encoder = int(z_encoder)
+    y_encoder = recCMD
+    cur_encoder = int(y_encoder)
     revCondition.release()
-
     num = mm * 100
-    target_p = cur_encoder - num
-    _dir = 1
-    while True:
-        if _dir:
-            cmd = "P4M-300"
-        else:
-            cmd = "P4M300"
-        writeCMDBuffer.append(cmd)
-        time.sleep(0.7)
-
-        writeCMDBuffer.append('P4G6064')
-        revCondition.acquire()
-        ret = revCondition.wait(3)
-        if not ret:
-            writeCMDBuffer.append('P4G6064')
-            revCondition.wait()
-            z_encoder = recCMD
-            cur_encoder = int(z_encoder)
-        revCondition.release()
-
-        err = target_p - cur_encoder
-        if err > 0:
-            _dir = 0
-        else:
-            _dir = 1
-            err = -err
-        if err < 400:
-            break
-
-
-def in_expand(mm):
-    global writeCMDBuffer
-    cur_encoder = 0
-    writeCMDBuffer.append('P4G6064')
-    revCondition.acquire()
-    ret = revCondition.wait(5)
-    if not ret:
-        writeCMDBuffer.append('P4G6064')
-        revCondition.wait()
-        z_encoder = recCMD
-        cur_encoder = int(z_encoder)
-    revCondition.release()
-
-    num = mm * 100
-    target_p = cur_encoder + num
-    _dir = 0
-    while True:
-        if _dir:
-            cmd = "P4M-300"
-        else:
-            cmd = "P4M300"
-        writeCMDBuffer.append(cmd)
-        time.sleep(0.7)
-
-        writeCMDBuffer.append('P4G6064')
-        revCondition.acquire()
-        ret = revCondition.wait(3)
-        if not ret:
-            writeCMDBuffer.append('P4G6064')
-            revCondition.wait()
-            z_encoder = recCMD
-            cur_encoder = int(z_encoder)
-        revCondition.release()
-
-        err = target_p - cur_encoder
-        if err > 0:
-            _dir = 0
-        else:
-            _dir = 1
-            err = -err
-        if err < 400:
-            break
+    encoder = cur_encoder + num
+    go_y_location(speed, 97000)
+    time.sleep(0.5)
 
 
 def grip():
@@ -389,7 +367,7 @@ def grip():
     writeCMDBuffer.append(cmd)
     time.sleep(0.5)
     writeCMDBuffer.append(cmd)
-    time.sleep(5)
+    time.sleep(4)
 
 
 def release():
@@ -398,7 +376,7 @@ def release():
     writeCMDBuffer.append(cmd)
     time.sleep(0.5)
     writeCMDBuffer.append(cmd)
-    time.sleep(5)
+    time.sleep(4)
 
 
 def go_z_location(speed, encoder):
@@ -425,8 +403,9 @@ def go_z_location(speed, encoder):
             cur_encoder = int(z_encoder)
         revCondition.release()
         err = encoder - cur_encoder
-        if -300 < err < 300:
-            stop_z()
+        if -500 < err < 500:
+            # writeCMDBuffer.append('P2P460FE1')
+            # time.sleep(0.2)
             break
         print("Doing, Err:%d" % err)
         writeCMDBuffer.append(cmd)
